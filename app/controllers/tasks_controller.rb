@@ -1,8 +1,8 @@
 class TasksController < ApplicationController
   def index
-    #@tasks = current_user.tasks.all
-    @q = current_user.tasks.ransack(params[:q])
-    @tasks = @q.result(distinct: true).page(params[:page])
+    @tasks = cache_tasks
+    #@q = current_user.tasks.ransack(params[:q])
+    #@tasks = @q.result(distinct: true).page(params[:page])
 
     respond_to do |format|
       format.html
@@ -21,6 +21,7 @@ class TasksController < ApplicationController
   def create
     @task = current_user.tasks.new(task_params)
     if @task.save
+      SampleJob.perform_later
       redirect_to @task, notice:"タスク「#{@task.name}」を登録しました。"
     else
       render :new
@@ -52,5 +53,11 @@ class TasksController < ApplicationController
 
   def task_params
     params.require(:task).permit(:name, :description,:image)
+  end
+
+  def cache_tasks
+    Rails.cache.fetch("cache_tasks", expired_in: 60.minutes) do
+      current_user.tasks.all.to_a
+    end
   end
 end
